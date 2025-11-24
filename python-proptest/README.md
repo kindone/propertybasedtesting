@@ -1,6 +1,6 @@
 # Python-proptest Analysis and Discussions
 
-This directory contains analysis scripts, documentation, and discussions specifically related to the Python property-based testing implementation (`pyproptest`).
+This directory contains analysis scripts, documentation, and discussions specifically related to the Python property-based testing implementation (`python-proptest`).
 
 ## Contents
 

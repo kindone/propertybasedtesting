@@ -55,6 +55,6 @@ The theoretical concerns identified in `CRITICAL_ANALYSIS_FLATMAP.md` are **not 
 ## Test Files
 
 The actual test suites are located in:
-- **Python**: `pyproptest/tests/combinator/test_flat_map_edge_cases.py` (8 tests)
+- **Python**: `python-proptest/tests/combinator/test_flat_map_edge_cases.py` (8 tests)
 - **C++**: `cppproptest2/proptest/test/test_flatmap_edge_cases.cpp` (5 tests)
 

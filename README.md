@@ -13,7 +13,7 @@ The workspace contains property-based testing libraries for multiple languages:
    - Most validated and comprehensive
    - Used as the benchmark for comparing other implementations
 
-2. **`pyproptest/`** - Python property-based testing framework
+2. **`python-proptest/`** - Python property-based testing framework
    - Published to PyPI as `python-proptest`
    - Actively developed and maintained
    - Currently being refactored to match cppproptest architecture
