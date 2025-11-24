@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../pyproptest"
+		},
+		{
+			"path": "../cppproptest2"
+		},
+		{
+			"path": "../dartproptest"
+		},
+		{
+			"path": "../jsproptest"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"iostream": "cpp"
+		}
+	}
+}
