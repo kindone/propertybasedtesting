@@ -157,6 +157,12 @@ Python scripts for visualizing and analyzing shrink trees:
 4. **Verify**: Test against cppproptest's expected behavior
 5. **Document**: Update status documents
 
+## Cross-Language TODO
+
+See [`TODO.md`](TODO.md) for cross-language implementation tasks and feature parity requirements.
+
+Current priority: **Floating Point Generator Enhancement** - Implement consistent finite-by-default float generation with optional inf/NaN probabilities across all languages (✅ Python done, 🔄 C++ in progress, ⏳ Dart/JS pending).
+
 ## Notes for AI Assistants
 
 When working in this workspace:
@@ -166,6 +172,7 @@ When working in this workspace:
 3. **Architecture**: Follow the generator/shrinker separation pattern
 4. **Shrinking**: Ensure shrinking matches cppproptest's strategies
 5. **Testing**: Verify against cppproptest test cases when possible
+6. **Cross-Language**: Check `TODO.md` for features that need to be implemented across all languages
 
 ## Related Workspaces
 
