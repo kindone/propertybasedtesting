@@ -2,199 +2,146 @@
 
 ## Summary
 
-**YES, we can create aliases for all C++ generator/combinator names in Python without breaking keyword restrictions.**
+**We should only alias truly interchangeable/equivalent names, not force C++ naming conventions into Python.**
 
-All C++ names are safe to use as Python method names. The main considerations are:
-1. **Naming convention differences** (camelCase vs snake_case)
-2. **Built-in name shadowing** (acceptable for method names)
-3. **Implementation feasibility** (some require new functionality)
+Honoring language styles means:
+- ✅ **Alias semantic equivalents**: `boolean`/`bool`, `integer`/`int`, `string`/`str` (same meaning, different word lengths)
+- ❌ **Don't alias style differences**: `oneOf`/`one_of`, `elementOf`/`element_of` (camelCase vs snake_case)
+- ❌ **Don't alias language-specific concepts**: `vector`/`list`, `map`/`dict` (different semantic contexts)
 
-## Detailed Analysis
+## Recommended Aliases (Semantic Equivalents Only)
 
-### ✅ Safe to Alias (No Conflicts)
+### ✅ Safe and Appropriate Aliases
 
-#### Generators - Primitive Types
-| C++ Name | Python Status | Notes |
-|----------|---------------|-------|
-| `gen::boolean` | ✅ Safe | Not a keyword, not a builtin. Can alias to `Gen.bool()` |
-| `gen::character` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::int8`, `gen::uint8` | ✅ Safe | Not keywords, not builtins |
-| `gen::int16`, `gen::uint16` | ✅ Safe | Not keywords, not builtins |
-| `gen::int32`, `gen::uint32` | ✅ Safe | Not keywords, not builtins |
-| `gen::int64`, `gen::uint64` | ✅ Safe | Not keywords, not builtins |
-| `gen::integer` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::float32`, `gen::float64` | ✅ Safe | Not keywords, not builtins |
-| `gen::arbitrary`, `gen::arbi` | ✅ Safe | Not keywords, not builtins (but need template-like API) |
+These are truly interchangeable names that mean the same thing:
 
-#### Generators - Strings
-| C++ Name | Python Status | Notes |
-|----------|---------------|-------|
-| `gen::string` | ✅ Safe | Not a keyword, not a builtin (Python uses `str` which is a builtin but works) |
-| `gen::utf8string` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::utf16bestring` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::utf16lestring` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::cesu8string` | ✅ Safe | Not a keyword, not a builtin |
+| C++ Name | Python Name | Rationale |
+|----------|-------------|-----------|
+| `gen::boolean` | `Gen.bool` | Both mean "boolean type" - just different word lengths |
+| `gen::integer` | `Gen.int` | Both mean "integer type" - just different word lengths |
+| `gen::string` | `Gen.str` | Both mean "string type" - just different word lengths |
 
-#### Generators - Containers
-| C++ Name | Python Status | Notes |
-|----------|---------------|-------|
-| `gen::vector` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::map` | ✅ Safe | Builtin `map` exists, but method names can shadow builtins (Python already does this with `dict`, `set`, `list`, `tuple`) |
-| `gen::optional` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::shared_ptr` | ✅ Safe | Not a keyword, not a builtin (underscore is fine) |
-| `gen::pair` | ✅ Safe | Not a keyword, not a builtin |
-
-#### Combinators
-| C++ Name | Python Status | Notes |
-|----------|---------------|-------|
-| `gen::dependency` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::derive` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::intervals` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::uintervals` | ✅ Safe | Not a keyword, not a builtin |
-| `gen::reference` | ✅ Safe | Not a keyword, not a builtin |
-
-### ⚠️ Naming Convention Differences (camelCase vs snake_case)
-
-These C++ names use camelCase, while Python uses snake_case. We can add both:
-
-| C++ Name (camelCase) | Python Name (snake_case) | Can Add Both? |
-|----------------------|--------------------------|---------------|
-| `gen::oneOf` | `Gen.one_of` | ✅ Yes - add `oneOf` as alias |
-| `gen::unionOf` | ❌ Not in Python | ✅ Yes - add `unionOf` (or `union_of`) |
-| `gen::elementOf` | `Gen.element_of` | ✅ Yes - add `elementOf` as alias |
-| `gen::weightedGen` | `Gen.weighted_gen` | ✅ Yes - add `weightedGen` as alias |
-| `gen::weightedVal` | `Gen.weighted_value` | ✅ Yes - add `weightedVal` as alias |
-
-**Note**: Python already uses builtin names as method names (`dict`, `set`, `list`, `tuple`, `str`, `int`, `float`, `bool`), so shadowing is acceptable.
-
-### 🔍 Built-in Name Shadowing
-
-Python already shadows builtins in the `Gen` class:
-- `Gen.int()` - shadows builtin `int`
-- `Gen.float()` - shadows builtin `float`
-- `Gen.str()` - shadows builtin `str`
-- `Gen.bool()` - shadows builtin `bool`
-- `Gen.list()` - shadows builtin `list`
-- `Gen.dict()` - shadows builtin `dict`
-- `Gen.set()` - shadows builtin `set`
-- `Gen.tuple()` - shadows builtin `tuple`
-
-Therefore, adding `Gen.map()` would be consistent with existing practice.
-
-### 📋 Implementation Requirements
-
-#### Simple Aliases (Just Point to Existing Methods)
-These can be simple assignments:
+**Implementation:**
 ```python
-# In Gen class
-boolean = bool  # Alias for Gen.bool()
-string = str    # Alias for Gen.str()
-integer = int   # Alias for Gen.int()
-oneOf = one_of  # Alias for Gen.one_of()
-elementOf = element_of  # Alias for Gen.element_of()
-weightedGen = weighted_gen  # Alias for Gen.weighted_gen()
-weightedVal = weighted_value  # Alias for Gen.weighted_value()
+# In Gen class - simple aliases
+boolean = bool      # Alias for Gen.bool()
+integer = int        # Alias for Gen.int()
+string = str        # Alias for Gen.str()
 ```
 
-#### New Functionality Required
-These would need new implementations:
+### ❌ Should NOT Alias (Style Differences)
 
-1. **Type-specific integer generators** (`int8`, `uint8`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64`)
-   - Python doesn't have separate types, but we can create generators that produce values in those ranges
-   - Example: `Gen.int8()` → generates values in range [-128, 127]
+These are naming convention differences, not semantic equivalents:
 
-2. **Float32/Float64** (`float32`, `float64`)
-   - Python `float` is always 64-bit, but we can add aliases
-   - `Gen.float32()` → alias to `Gen.float()` (same implementation)
-   - `Gen.float64()` → alias to `Gen.float()` (same implementation)
+| C++ Name | Python Name | Reason |
+|----------|-------------|--------|
+| `gen::oneOf` | `Gen.one_of` | camelCase vs snake_case - style difference |
+| `gen::elementOf` | `Gen.element_of` | camelCase vs snake_case - style difference |
+| `gen::weightedGen` | `Gen.weighted_gen` | camelCase vs snake_case - style difference |
+| `gen::weightedVal` | `Gen.weighted_value` | camelCase vs snake_case - style difference |
+| `gen::unionOf` | ❌ Not in Python | Would need to add, but should use `union_of` if added |
 
-3. **UTF-16 strings** (`utf16bestring`, `utf16lestring`)
-   - Would need new generator implementations
+**Rationale**: Python uses snake_case consistently. Adding camelCase aliases would:
+- Violate PEP 8 style guidelines
+- Create inconsistency in the API
+- Confuse Python developers expecting snake_case
+- Not provide real value (just cosmetic differences)
 
-4. **CESU-8 string** (`cesu8string`)
-   - Would need new generator implementation
+### ❌ Should NOT Alias (Language-Specific Concepts)
 
-5. **Vector** (`vector`)
-   - Can alias to `Gen.list()` (same concept)
+These represent different concepts in different languages:
 
-6. **Map** (`map`)
-   - Can alias to `Gen.dict()` (same concept)
+| C++ Name | Python Name | Reason |
+|----------|-------------|--------|
+| `gen::vector` | `Gen.list` | Different semantic contexts - C++ uses `vector`, Python uses `list` |
+| `gen::map` | `Gen.dict` | Different semantic contexts - C++ uses `map`, Python uses `dict` |
 
-7. **Optional** (`optional`)
-   - Would need new generator implementation (Python has `Optional[T]` type hint)
+**Rationale**: While they're conceptually similar (dynamic arrays, key-value stores), they're named differently in each language's standard library. Aliasing would:
+- Confuse Python developers (who expect `list` and `dict`)
+- Not match the language's idioms
+- Create unnecessary cognitive overhead
 
-8. **Shared Pointer** (`shared_ptr`)
-   - Python doesn't have shared_ptr, but could generate objects that are reference-counted
-   - May not be meaningful in Python context
+### ❓ Context-Dependent (Type-Specific Generators)
 
-9. **Pair** (`pair`)
-   - Can use `Gen.tuple()` with 2 elements, or create convenience method
+These are C++-specific type concepts that don't exist in Python:
 
-10. **Arbitrary/Arbi** (`arbitrary`, `arbi`)
-    - C++ uses templates, Python would need type parameter or different API
-    - Could be: `Gen.arbitrary(int)` or `Gen[int]` (requires `__class_getitem__`)
+| C++ Name | Python Equivalent | Recommendation |
+|----------|-------------------|----------------|
+| `gen::int8`, `gen::uint8`, etc. | ❌ Not in Python | **Don't add** - Python doesn't have these as separate types. If needed, document using `Gen.int(min, max)` with appropriate ranges. |
+| `gen::float32`, `gen::float64` | `Gen.float` | **Don't add** - Python `float` is always 64-bit. Adding `float32`/`float64` would be misleading. |
+| `gen::optional` | ❌ Not in Python | **Consider adding** if useful, but use Python naming (`optional` is fine, or `opt`) |
+| `gen::shared_ptr` | ❌ Not in Python | **Don't add** - Python doesn't have shared_ptr concept (everything is reference-counted) |
+| `gen::pair` | `Gen.tuple` | **Don't add** - Python uses `tuple` for pairs. Document using `Gen.tuple(gen1, gen2)`. |
 
-11. **Dependency** (`dependency`)
-    - Similar to `chain`, but returns `pair` instead of `tuple`
-    - Could alias to `chain` or implement separately
+## Python Style Guidelines
 
-12. **Derive** (`derive`)
-    - Would need new implementation (similar to dependency but different semantics)
+### PEP 8 Compliance
 
-13. **Intervals** (`intervals`, `uintervals`)
-    - Would need new implementation for interval-based integer generation
+Python follows PEP 8 naming conventions:
+- **Functions and methods**: `snake_case` (e.g., `one_of`, `element_of`)
+- **Classes**: `PascalCase` (e.g., `Gen`, `Generator`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_SIZE`)
 
-14. **Reference** (`reference`)
-    - Would need new implementation (C++-specific concept)
+The current `Gen` class correctly uses `snake_case` for all methods.
 
-15. **UnionOf** (`unionOf`)
-    - Can alias to `Gen.one_of()` (same concept)
+### Consistency Matters
 
-## Recommended Approach
+Looking at the existing codebase:
+- ✅ `Gen.one_of()` - snake_case
+- ✅ `Gen.element_of()` - snake_case
+- ✅ `Gen.weighted_gen()` - snake_case
+- ✅ `Gen.weighted_value()` - snake_case
+- ✅ `Gen.chain()` - snake_case
+- ✅ `Gen.aggregate()` - snake_case
 
-### Phase 1: Simple Aliases (No New Code)
-Add aliases that just point to existing methods:
-- `boolean` → `bool`
-- `string` → `str`
-- `integer` → `int`
-- `oneOf` → `one_of`
-- `elementOf` → `element_of`
-- `weightedGen` → `weighted_gen`
-- `weightedVal` → `weighted_value`
-- `unionOf` → `one_of`
-- `vector` → `list`
-- `map` → `dict`
-- `float32` → `float`
-- `float64` → `float`
+Adding camelCase aliases would break this consistency.
 
-### Phase 2: Type-Specific Generators (Simple Wrappers)
-Add integer type generators that wrap `IntGenerator` with appropriate ranges:
-- `int8()` → `IntGenerator(-128, 127)`
-- `uint8()` → `IntGenerator(0, 255)`
-- `int16()` → `IntGenerator(-32768, 32767)`
-- `uint16()` → `IntGenerator(0, 65535)`
-- `int32()` → `IntGenerator(-2147483648, 2147483647)`
-- `uint32()` → `IntGenerator(0, 4294967295)`
-- `int64()` → `IntGenerator(-9223372036854775808, 9223372036854775807)`
-- `uint64()` → `IntGenerator(0, 18446744073709551615)`
+## Final Recommendation
 
-### Phase 3: New Functionality (If Needed)
-Implement generators that don't exist yet:
-- UTF-16 string generators
-- CESU-8 string generator
-- Optional generator
-- Pair generator (or document using tuple)
-- Dependency/Derive combinators
-- Intervals combinator
-- Reference combinator
+### ✅ Add These Aliases (3 total)
+
+```python
+class Gen:
+    # ... existing methods ...
+    
+    # Semantic equivalent aliases
+    boolean = bool      # Alias for Gen.bool()
+    integer = int       # Alias for Gen.int()
+    string = str        # Alias for Gen.str()
+```
+
+**Rationale**: These are truly interchangeable - same meaning, just different word lengths. They're common in both languages and don't violate style guidelines.
+
+### ❌ Don't Add These
+
+1. **Style differences** (camelCase vs snake_case):
+   - `oneOf`, `elementOf`, `weightedGen`, `weightedVal`, `unionOf`
+   - Reason: Violates Python style conventions
+
+2. **Language-specific concepts**:
+   - `vector` → `list`, `map` → `dict`
+   - Reason: Different semantic contexts in each language
+
+3. **Type-specific generators** (C++-only concepts):
+   - `int8`, `uint8`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64`
+   - `float32`, `float64`
+   - `shared_ptr`
+   - Reason: Don't exist in Python or would be misleading
+
+4. **New functionality** (would need implementation):
+   - `utf16bestring`, `utf16lestring`, `cesu8string`
+   - `dependency`, `derive`, `intervals`, `reference`
+   - Reason: Would need new implementations, not just aliases
 
 ## Conclusion
 
-**All C++ names can be safely aliased in Python.** There are no keyword conflicts, and builtin shadowing is already an established pattern in the `Gen` class. The main work is:
+**Keep it minimal and style-appropriate.** Only add aliases for truly semantic equivalents (`boolean`/`bool`, `integer`/`int`, `string`/`str`). Don't add aliases that:
+- Violate Python naming conventions (camelCase)
+- Force C++ idioms into Python (vector/list, map/dict)
+- Represent concepts that don't exist in Python (type-specific integers, shared_ptr)
 
-1. **Immediate**: Add simple aliases for existing functionality
-2. **Short-term**: Add type-specific integer generators (simple wrappers)
-3. **Long-term**: Implement new generators/combinators that don't exist yet (if desired)
-
-The naming convention differences (camelCase vs snake_case) can be handled by providing both names, which is common in Python libraries that want to support multiple naming styles.
-
+This approach:
+- ✅ Respects Python style (PEP 8)
+- ✅ Maintains API consistency
+- ✅ Provides value without confusion
+- ✅ Keeps the codebase clean and maintainable
