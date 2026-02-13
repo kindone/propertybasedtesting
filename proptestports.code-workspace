@@ -19,7 +19,12 @@
 	"settings": {
 		"files.associations": {
 			"iostream": "cpp",
-			"limits": "cpp"
+			"limits": "cpp",
+			"optional": "cpp",
+			"iomanip": "cpp",
+			"string": "cpp",
+			"locale": "cpp",
+			"tuple": "cpp"
 		}
 	}
 }
