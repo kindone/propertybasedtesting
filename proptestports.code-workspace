@@ -24,7 +24,11 @@
 			"iomanip": "cpp",
 			"string": "cpp",
 			"locale": "cpp",
-			"tuple": "cpp"
+			"tuple": "cpp",
+			"cstdint": "cpp",
+			"list": "cpp",
+			"map": "cpp",
+			"sstream": "cpp"
 		}
 	}
 }
