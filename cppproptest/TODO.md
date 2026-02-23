@@ -19,6 +19,7 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **[x] Generator named params Phase 2 (container)** — `ContainerGenConfig<T>` for `Arbi<vector<T>>`, `Arbi<list<T>>`, `Arbi<set<T>>`; `gen::vector<int>({.minSize = 5, .maxSize = 20})`; tests in test_arbitrary.cpp; docs in Generators.md, Arbitrary.md.
 - **[x] Generator named params Phase 3 (string)** — `ContainerGenConfig<char>` for `Arbi<std::string>`, `ContainerGenConfig<uint32_t>` for `Arbi<UTF8String>`, `Arbi<UTF16BEString>`, `Arbi<UTF16LEString>`, `Arbi<CESU8String>`; tests in test_arbitrary.cpp; docs in Generators.md, Arbitrary.md.
 - **[x] Generator named params Phase 4 (map)** — `MapGenConfig<K,V>` with `keyGen`, `valueGen`, `minSize`, `maxSize` for `Arbi<map<K,V>>`; `gen::map<int,int>({.keyGen = gen::int32(), .valueGen = gen::int32(), .minSize = 5, .maxSize = 20})`; tests in test_arbitrary.cpp; docs in Generators.md, Arbitrary.md.
+- **[x] gen::weightedGen — accept raw values; unify with weightedVal** — `gen::weighted(value, prob)` and `gen::weighted(gen, prob)` as primary API; `weightedVal` and `weightedGen` as explicit alternatives; unified `weighted.hpp`; elementOf rejects `weighted(gen)` with clear static_assert; docs in Combinators.md, Generators.md, StatefulTesting.md.
 
 ---
 
@@ -29,12 +30,6 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 ---
 
 ## Future Enhancements (by suggested urgency: quick wins → medium → larger)
-
-### [ ] gen::weightedGen — accept raw values; unify with weightedVal
-- Allow `gen::weightedGen(value, weight)` for raw T (implicit just), like `oneOf` does. Avoids `weightedGen<T>(gen::just(value), weight)` and lvalue deduction issues.
-- **Unify**: Consider unifying `weightedGen` and `weightedVal` where appropriate — both produce `Weighted<T>`; `weightedVal` is for elementOf, `weightedGen` for oneOf. A single overload set could accept generator-or-value.
-- **Design**: Overload weightedGen for raw T (convertible, !GenLike); treat as gen::just(value). Backward compatible.
-- **Next**: Audit weightedGen/weightedVal usages; design unified API; tests; Combinators.md.
 
 ### [ ] Shrinking with retry + timeout (non-deterministic tests)
 - **Problem**: Shrink assumes determinism; one run per candidate. Flaky/concurrent tests need retries and per-run timeout.
