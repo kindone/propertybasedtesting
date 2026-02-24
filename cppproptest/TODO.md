@@ -32,9 +32,19 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 ## Future Enhancements (by suggested urgency: quick wins → medium → larger)
 
 ### [ ] Shrinking with retry + timeout (non-deterministic tests)
-- **Problem**: Shrink assumes determinism; one run per candidate. Flaky/concurrent tests need retries and per-run timeout.
-- **Proposed**: Configurable retries per candidate; policy (e.g. fail iff fails ≥ K of N); **timeout per shrink retry** (e.g. `shrinkRetryTimeoutMs`) so a single run doesn’t block. Config: Property/ForAllConfig or dedicated shrink-config (`shrinkRetries`, `shrinkTolerance`, `shrinkRetryTimeoutMs`).
-- **Next**: Find shrink loop; design config + timeout behavior; retry loop + policy; flaky-property tests; Shrinking.md.
+- **Problem**: Shrink assumes determinism; one run per candidate. Flaky/concurrent tests need retries and per-candidate timeout.
+- **Contexts**: (1) forAll — full shrinking, strict default; (2) stateful — uses forAll, propagate config; (3) concurrency — no shrink yet (`handleShrink` is empty); same config params, but defaults favor timeout over retries (reproduction rates can be very low); needs separate design.
+- **Config** (ForAllConfig): `shrinkMaxRetries`, `shrinkTimeoutMs` (total phase), `shrinkRetryTimeoutMs` (per-candidate). Adaptive retry on by default (no flag for now).
+- **Adaptive retry**: On failure, run confirmation to measure reproduction rate (fail_count, elapsed_time). Empirical time informs per-candidate budget: `expected_time = elapsed / fail_count`, `budget = expected_time × multiplier` (hard-coded ~3), capped by config. Retry until first failure found or limits hit.
+- **Report**: `reproduction: 5/10 in 1.2s` on initial failure and each successful shrink.
+- **Next**: Implement in PropertyBase::shrink(); add config to ForAllConfig; propagate to StatefulProperty; flaky-property tests; Shrinking.md.
+
+### [ ] Concurrency testing shrinking
+- **Structure**: Tuple of 3: `(object, front, rears)` where `rears` is `list<list<Action>>`. No additional shrinker needed — list shrinker composes (outer list = fewer threads, inner lists = fewer actions per thread).
+- **Shrink order**: Reverse dependency order — rears → front → object, so use tuple order `(rears, front, object)`.
+- **Failure-point truncation**: Reliable for front (sequential), failed rear thread; unreliable for other rear threads. For other threads: log can lag behind true completion (CPU/compiler reordering). With `memory_order_release` on `markActionEnd`, lag bounded to at most 1 action; without it, lag can be unbounded. Use partial truncation where reliable; rely on shrink candidates for other rears.
+- **ConcurrentTestDump**: Log tracks `markActionStart`/`markActionEnd` per thread. Gives lower bound ("at least N completed") but not upper bound for truncation. Add `memory_order_release` to bound lag.
+- **Next**: Implement in `handleShrink`; same pattern as PropertyBase::shrink with retry/timeout; reuse same config.
 
 ### [ ] Regex-based string generator
 - `gen::regex(pattern)` (optional size/constraints). Use cases: email, phone, UUID, IP, custom formats.

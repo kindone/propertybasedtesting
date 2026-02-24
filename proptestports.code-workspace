@@ -28,7 +28,8 @@
 			"cstdint": "cpp",
 			"list": "cpp",
 			"map": "cpp",
-			"sstream": "cpp"
+			"sstream": "cpp",
+			"__config": "cpp"
 		}
 	}
 }
