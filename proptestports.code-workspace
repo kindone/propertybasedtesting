@@ -29,7 +29,27 @@
 			"list": "cpp",
 			"map": "cpp",
 			"sstream": "cpp",
-			"__config": "cpp"
+			"__config": "cpp",
+			"regex": "cpp",
+			"any": "cpp",
+			"__verbose_abort": "cpp",
+			"cmath": "cpp",
+			"cstddef": "cpp",
+			"cstdio": "cpp",
+			"cstdlib": "cpp",
+			"cstring": "cpp",
+			"cwchar": "cpp",
+			"cwctype": "cpp",
+			"execution": "cpp",
+			"memory": "cpp",
+			"initializer_list": "cpp",
+			"iosfwd": "cpp",
+			"new": "cpp",
+			"stdexcept": "cpp",
+			"string_view": "cpp",
+			"typeinfo": "cpp",
+			"variant": "cpp",
+			"algorithm": "cpp"
 		}
 	}
 }
