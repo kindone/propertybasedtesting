@@ -25,6 +25,13 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **[x] EXPECT_FOR_ALL failure output cleanup** — migrated wrappers to public GTest predicate-format assertions (`EXPECT_PRED_FORMAT1` / `ASSERT_PRED_FORMAT1`) with custom `AssertionResult` messages; avoids lambda body dumps and internal variable names.
 - **[x] Optional config members for Property/StatefulProperty** — replaced sentinel values with `optional<T>` in config paths (`seed`, run limits, shrink retry settings), removing sentinel collisions and clarifying unset/default semantics.
 - **[x] Seed type + unbiased seed generator** — added `Seed` wrapper type and `gen::seed()` generator (uniform `uint64_t`, no shrinking, no boundary bias from integral generators). Output now renders as `Seed(<n>)` in argument sets; shrink-retry tests migrated from `gen::uint64().noShrink()`.
+- **[x] Expose reproduction stats / result access for tests** — added `ReproductionStats` with `getLastReproductionStats()`, `setOnReproductionStats(...)`, and `setOnFailureReproduction(...)` in property/stateful APIs; validated in `test_shrink_retry.cpp` with structured assertions.
+- **[x] Document Seed API update (user-facing)** — documented `Seed`/`gen::seed()` semantics and usage in user docs, including why to use it, `Seed(<n>)` output format, and no-shrink behavior.
+- **[x] Skip redundant "simplest args found by shrinking" line** — when no shrink step succeeds, do not print `simplest args found by shrinking` for the original args; validated by `Property.shrink_output_omits_simplest_line_when_no_shrink_happened`.
+- **[x] Shrinking with retry + timeout for forAll/stateful (non-deterministic tests)** — implemented retry-based shrink flow in `PropertyBase::shrink` with timeout/config support and stateful propagation (stateful uses forAll), including reproduction-rate reporting (`reproduction: X/Y in Zs`).
+- **[x] Improve stateful shrink order (action list first)** — stateful internal `forAll` now orders tuple as `(actionList, initialObject)`, so existing tuple shrink naturally prioritizes action-list shrinking first.
+- **[x] Shrinking with retry + timeout for concurrency path** — implemented retry/timeout-aware shrink handling in concurrency `handleShrink`, added concurrency shrink config setters (`setShrinkMaxRetries`, `setShrinkTimeoutMs`, `setShrinkRetryTimeoutMs`), and validated with `concurrency_function.shrink_with_retry_timeout_smoke`.
+- **[x] Lower default action-list size + add stateful/concurrency list-size config** — reduced stateful/concurrency action-list default max to 20 and added explicit API knobs (`setActionListMinSize`, `setActionListMaxSize`, `setActionListSize`) for both paths; added validation tests (`stateful_function.action_list_size_configuration`, `concurrency_function.action_list_size_configuration`).
 
 ---
 
@@ -34,29 +41,7 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 
 ---
 
-## Future Enhancements (by suggested urgency: quick wins → medium → larger)
-
-### [ ] Chainable property tests with Google Test integration
-- **Problem**: EXPECT_FOR_ALL, ASSERT_FOR_ALL, EXPECT_MATRIX, ASSERT_MATRIX wrap `forAll`/`matrix` in EXPECT_TRUE/ASSERT_TRUE. The macros are inherently not chainable: you cannot chain `.example(...)`, `.matrix(...)`, or another `.forAll(...)` after them. The expansion `EXPECT_TRUE(forAll(...))` consumes the result; the outer expression is EXPECT_TRUE, so `.example()` etc. cannot be appended. Verbosity of `EXPECT_TRUE(property(callable).setSeed(0).forAll(gen))` is acceptable, but that form still doesn't allow `.forAll(gen1).example(list).matrix(...)` — i.e. chaining multiple execution modes.
-- **Goal**: Integrate with Google Test (EXPECT/ASSERT, failure format) while allowing chaining of forAll/example/matrix (e.g. `prop.forAll(gen1).example(list).forAll(gen2)` or similar).
-- **Possible directions**: (1) Lazy wrapper that collects a chain of forAll/example/matrix; when evaluated (or `.run()`), executes the chain and feeds final result to EXPECT_TRUE; (2) Macro `EXPECT_PROPERTY(expr)` that accepts a full chain: `EXPECT_PROPERTY(property(callable).forAll(gen1).example(list))`; (3) Builder that returns a type with `.expect()` / `.assert()` methods, each returning a chainable builder.
-- **Location**: Property.hpp (macros, forAll/matrix), PropertyAPI.md.
-
-### [ ] Add throw-on-failure execution mode for `forAll` / `matrix` (for better GTest integration)
-- **Problem**: Current `forAll`/`matrix` return `bool` and print failure details to stderr. `EXPECT_FOR_ALL` can only assert the bool result, so Google Test cannot directly receive the property failure as an exception-driven failure flow.
-- **Goal**: Provide an execution mode that throws on first property failure (e.g. `forAllThrow(...)` / option flag), so `EXPECT_FOR_ALL`-style helpers can use `EXPECT_NO_THROW` / `ASSERT_NO_THROW` (or equivalent) and rely on GTest-native failure propagation/reporting.
-- **Possible API**: (1) New helpers `forAllThrow(...)` and `matrixThrow(...)`; (2) Config flag in `ForAllConfig`/Property config such as `.throwOnFailure = true`; (3) `property(...).setThrowOnFailure(true).forAll(...)`.
-- **Error model**: Throw a typed exception containing failure metadata (condition, file, line, serialized args, maybe shrink/reproduction stats), so callers can format or rethrow consistently.
-- **EXPECT/ASSERT macros**: Add experimental `EXPECT_FOR_ALL_THROW` / `ASSERT_FOR_ALL_THROW` (temporary naming) to validate viability before replacing existing macros.
-- **Validation**: Add tests confirming thrown exception includes accurate file/line and args, and that GTest output is clearer than bool-based wrappers for inline lambdas.
-- **Location**: `PropertyBase` run/shrink path, `Property.hpp` API/macros, docs in `PropertyAPI.md`.
-
-### [x] Skip "simplest args found by shrinking" when shrunk args are identical to original
-- **Problem**: When shrinking finds nothing simpler (e.g. gen::uint64().noShrink(), or shrink stream empty), we print both "with args: { X }" and "simplest args found by shrinking: { X }" — redundant.
-- **Fix**: Track whether any shrink step succeeded; omit the "simplest args found by shrinking" line when no shrink occurred.
-- **Location**: PropertyBase.cpp shrink loop; add `anyShrinkFound` flag.
-- **Completed**: Added `anyShrinkFound` tracking in `PropertyBase::shrink()` and print the "simplest args found by shrinking" line only when at least one shrink step succeeds.
-- **Validation**: Added `Property.shrink_output_omits_simplest_line_when_no_shrink_happened` in `proptest/test/test_property.cpp` to verify the line is omitted for `noShrink` failure cases.
+## Future Enhancements (ordered by complexity: simpler -> more complex)
 
 ### [ ] assessFailureForRetry: respect shrink phase timeout
 - **Problem**: `assessFailureForRetry` runs `kShrinkAssessmentRuns` (10) unconditionally and does not check `shrinkTimeoutMs`. For slow tests (e.g. 300ms per run), assessment alone takes 3s and can exceed the shrink phase budget (e.g. shrinkTimeoutMs=2000). The shrink loop then exits immediately; assessment dominates and ignores the configured limit.
@@ -70,42 +55,60 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **Possible directions**: Lower default verbosity in test-only paths, gate detailed messages behind a debug flag, tune timeout test parameters/runs, and prefer deterministic assertions over broad retries where feasible.
 - **Location**: `proptest/test/test_shrink_retry.cpp`, related test utilities, and CI expectations/docs.
 
-### [ ] Document recent behavior and API updates
-- **Problem**: Several recent improvements are implemented but not yet fully documented together, which makes behavior harder to understand for contributors/users.
-- **Scope (user-facing only)**: Document public behavior/API only: nested property failure/reporting behavior visible to users (`forAll` + `EXPECT_FOR_ALL` interactions), `Seed` wrapper and `gen::seed()` semantics, and user-visible shrink-retry reporting interpretation (`numReproduced` in output/API).
-- **Goal**: Add/refresh docs so users can quickly understand expected public behavior, output, and recommended usage patterns.
-- **Location**: `docs/PropertyAPI.md`, `docs/Shrinking.md`.
+### [ ] Add labeled shrink output for stateful path (`initial`, `actions`)
+- **Problem**: Stateful shrink output is positional tuple-style (`{ [actions], [initial] }`), which is less readable than labeled fields.
+- **Goal**: Provide labeled output for stateful shrink logs (e.g., `{ actions: [...], initial: ... }`) similar to concurrency labeling.
+- **Constraint**: Stateful currently delegates through generic `forAll` argument printing; may require a custom wrapper/printer approach rather than a small local formatting change.
+- **Location**: stateful path formatting via `Property` argument printing and related display helpers.
 
-### [x] Shrinking with retry + timeout for forAll/stateful (non-deterministic tests)
-- **Problem**: Shrink assumed determinism (single run per candidate), which was insufficient for flaky behavior.
-- **Completed scope**: Implemented retry-based shrink flow in `PropertyBase::shrink` with timeout/config support, then propagated through stateful path (stateful uses forAll). Added tests and docs for this scope.
-- **Config**: `shrinkMaxRetries`, `shrinkTimeoutMs` (total phase), `shrinkRetryTimeoutMs` (per-candidate); adaptive retry behavior enabled by default.
-- **Reporting**: Reproduction-rate reporting is included (e.g. `reproduction: X/Y in Zs`) for initial failure / successful shrink assessments.
+### [ ] Replace GTest internal stdout/stderr capture dependency with output-stream options
+- **Problem**: Some tests rely on `testing::internal::CaptureStdout()` / `CaptureStderr()` to assert output text. These are Google Test internal APIs and not stable public interfaces.
+- **Goal**: Add optional output-stream parameters so property execution can write to caller-provided streams in tests, while defaulting to current stdout/stderr behavior when not specified.
+- **Scope**: Introduce a user-facing/public config path for output sinks (e.g., in `ForAllConfig` / property config), then migrate tests away from GTest internal capture APIs.
+- **Validation**: Update output-verification tests to use injected streams (`std::stringstream`) and ensure existing CLI/CI output remains unchanged by default.
+- **Location**: `PropertyBase` output paths (`cout`/`cerr` writes), `Property` config surface (`Property.hpp` / `PropertyBase.hpp`), and tests in `proptest/test/*`.
 
-### [ ] Shrinking with retry + timeout for concurrency path
-- **Problem**: Concurrency shrink path is separate and still incomplete; `handleShrink` remains the missing integration point.
-- **Goal**: Apply the same retry/timeout approach in concurrency shrinking, with concurrency-specific handling for failure-point truncation and memory-order effects.
-- **Next**: Implement in `handleShrink`; reuse the same config surface and align behavior with PropertyBase shrink retry flow.
+### [ ] Replace CaptureStdout/CaptureStderr-based tests with callback-driven assertions
+- **Problem**: Tests that assert console text via `CaptureStdout`/`CaptureStderr` are brittle and tied to Google Test internals.
+- **Goal**: Prefer callback-based observability for test assertions (e.g., existing and additional hooks), reducing dependence on output capture.
+- **Scope**: Expand callback surface where needed (while keeping APIs minimal), then migrate output-dependent tests to callback assertions first; use stream capture only as fallback.
+- **Examples**: Reproduction/shrink callbacks, per-failure callbacks, and optional new callbacks for key lifecycle events if needed.
+- **Location**: `PropertyBase`/stateful/concurrency callback APIs and tests under `proptest/test/*`.
 
-### [ ] Expose reproduction stats / result access for tests
-- **Problem**: Shrink retry tests currently capture stdout/stderr and parse output (e.g. regex for `reproduction: X/Y in Zs`). This is fragile (format changes break tests), not thread-safe, and couples tests to presentation.
-- **Goal**: Provide programmatic access to shrink/failure stats so tests can assert on structured data instead of parsing output.
-- **Rationale**: Fits the existing pull-style API: `prop.forAll()` returns a result; tests inspect it. No callbacks, no output capture.
-- **Design details** (to be refined):
-  - **What to expose**:
-    - `ReproductionStats`: `{ reproductions (X), totalRuns (Y), timeSec, argsAsString }` — from assessment phase
-    - `argsAsString`: serialized args (e.g. `"{ 0 }"`) — simple, matches current output format; for re-run tests, caller can parse or use as-is for assertions
-  - **Single + callback compromise**:
-    - **Single**: `optional<ReproductionStats> getLastReproductionStats() const` — latest only, no storage overhead when unused.
-    - **Callback**: `setOnReproductionStats(std::function<void(ReproductionStats)>)` — called upon each assessment (initial failure, each successful shrink if `kShrinkAssessOnEachSuccess`). Consumer can accumulate into a list if needed; framework does not store a list.
-  - **Per-failure callback** (for detailed error collection):
-    - `setOnFailureReproduction(std::function<void(int assessmentIndex, const vector<Any>& args, const string& errorMsg)>)` — called on each individual failure during assessment (e.g. 5 times if X=5 in "5/10"). `assessmentIndex`: 0 = initial failure, 1 = first successful shrink, etc. `args`: the actual args used for that run. Enables collecting all error messages, stack traces, etc. Optional; no cost when not set.
-  - **When populated**: Only after a failure that triggered shrink; only when `shrinkMaxRetries > 0` (retry mode). Deterministic shrink has no assessment; `getLastReproductionStats()` returns `nullopt`.
-  - **Stateful**: Propagate through same mechanism; stateful uses PropertyBase internally.
-- **Test impact**: Tests in `test_shrink_retry.cpp` could replace `captureOutput` + regex with `EXPECT_GE(result.getLastReproductionStats()->reproductions, 1)` etc.
-- **Open questions**:
-  - Backward compatibility: keep printing to cout/cerr; result access is additive only.
-- **Next**: Finalize struct design; implement; refactor tests.
+### [ ] Add thin time API wrapper (steady clock abstraction)
+- **Problem**: Time logic currently uses `std::chrono::steady_clock` directly across code paths, making backend/library replacement harder.
+- **Goal**: Introduce a thin project-level time abstraction (e.g., `Clock`/`TimePoint` helpers) for elapsed-time measurements and timeout checks.
+- **Scope**: Wrap core `steady_clock` usages behind a small API, keep behavior unchanged, and refactor key timeout/shrink paths to use the wrapper.
+- **Benefit**: Improves modularity and allows swapping/adapting time backend in the future with minimal call-site changes.
+- **Location**: `proptest/std/chrono.hpp` (or new time wrapper), `PropertyBase`, stateful/concurrency timeout logic, and related tests.
+
+### [ ] Add validation test for stateful shrink-order behavior
+- **Problem**: We changed stateful internal tuple order to prioritize action-list shrinking first, but there is no dedicated regression test that verifies this behavior.
+- **Goal**: Add a stable, deterministic test that fails if shrink priority regresses away from action-list-first.
+- **Notes**: Test design is non-trivial; revisit with a minimal, robust scenario that avoids brittle output-only assertions.
+- **Location**: `proptest/test/test_stateful_function.cpp` (or `proptest/test/test_shrink_retry.cpp`).
+
+### [ ] Add throw-on-failure execution mode for `forAll` / `matrix` (for better GTest integration)
+- **Problem**: Current `forAll`/`matrix` return `bool` and print failure details to stderr. `EXPECT_FOR_ALL` can only assert the bool result, so Google Test cannot directly receive the property failure as an exception-driven failure flow.
+- **Goal**: Provide an execution mode that throws on first property failure (e.g. `forAllThrow(...)` / option flag), so `EXPECT_FOR_ALL`-style helpers can use `EXPECT_NO_THROW` / `ASSERT_NO_THROW` (or equivalent) and rely on GTest-native failure propagation/reporting.
+- **Possible API**: (1) New helpers `forAllThrow(...)` and `matrixThrow(...)`; (2) Config flag in `ForAllConfig`/Property config such as `.throwOnFailure = true`; (3) `property(...).setThrowOnFailure(true).forAll(...)`.
+- **Error model**: Throw a typed exception containing failure metadata (condition, file, line, serialized args, maybe shrink/reproduction stats), so callers can format or rethrow consistently.
+- **EXPECT/ASSERT macros**: Add experimental `EXPECT_FOR_ALL_THROW` / `ASSERT_FOR_ALL_THROW` (temporary naming) to validate viability before replacing existing macros.
+- **Validation**: Add tests confirming thrown exception includes accurate file/line and args, and that GTest output is clearer than bool-based wrappers for inline lambdas.
+- **Location**: `PropertyBase` run/shrink path, `Property.hpp` API/macros, docs in `PropertyAPI.md`.
+
+### [ ] Chainable property tests with Google Test integration
+- **Problem**: EXPECT_FOR_ALL, ASSERT_FOR_ALL, EXPECT_MATRIX, ASSERT_MATRIX wrap `forAll`/`matrix` in EXPECT_TRUE/ASSERT_TRUE. The macros are inherently not chainable: you cannot chain `.example(...)`, `.matrix(...)`, or another `.forAll(...)` after them. The expansion `EXPECT_TRUE(forAll(...))` consumes the result; the outer expression is EXPECT_TRUE, so `.example()` etc. cannot be appended. Verbosity of `EXPECT_TRUE(property(callable).setSeed(0).forAll(gen))` is acceptable, but that form still doesn't allow `.forAll(gen1).example(list).matrix(...)` — i.e. chaining multiple execution modes.
+- **Goal**: Integrate with Google Test (EXPECT/ASSERT, failure format) while allowing chaining of forAll/example/matrix (e.g. `prop.forAll(gen1).example(list).forAll(gen2)` or similar).
+- **Possible directions**: (1) Lazy wrapper that collects a chain of forAll/example/matrix; when evaluated (or `.run()`), executes the chain and feeds final result to EXPECT_TRUE; (2) Macro `EXPECT_PROPERTY(expr)` that accepts a full chain: `EXPECT_PROPERTY(property(callable).forAll(gen1).example(list))`; (3) Builder that returns a type with `.expect()` / `.assert()` methods, each returning a chainable builder.
+- **Location**: Property.hpp (macros, forAll/matrix), PropertyAPI.md.
+
+### [ ] Merge concurrency shrink output styles (detailed + compact fallback)
+- **Problem**: Current concurrency shrink logs use compact placeholders (`<initial>`, `ActionList(size=...)`), while stateful shrink logs can show full values/actions when printable; outputs are inconsistent.
+- **Goal**: Use a merged strategy: prefer detailed stateful-style output (full initial object and actions when printers are available), but automatically fall back to compact summaries when types are not printable or output is too long.
+- **Scope**: Add configurable/automatic thresholding for long action lists and safe fallback formatting for non-printable object/action types.
+- **Benefit**: Improves debugging fidelity while keeping logs robust and readable in large/non-printable cases.
+- **Location**: concurrency shrink arg formatting in `proptest/stateful/concurrency_function.hpp` (and shared formatting helpers if extracted).
 
 ### [ ] Concurrency testing shrinking
 - **Structure**: Tuple of 3: `(object, front, rears)` where `rears` is `list<list<Action>>`. No additional shrinker needed — list shrinker composes (outer list = fewer threads, inner lists = fewer actions per thread).
@@ -114,6 +117,40 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **Failure-point truncation**: Reliable for front (sequential), failed rear thread; unreliable for other rear threads. For other threads: log can lag behind true completion (CPU/compiler reordering). With `memory_order_release`, lag bounded to at most 1 action; with relaxed, unbounded. Use partial truncation where reliable; rely on shrink candidates for other rears.
 - **ConcurrentTestDump**: Log tracks `markActionStart`/`markActionEnd` per thread for total ordering of enter/exit. Configurable memory order: relaxed (best reproducibility, unbounded lag), release (bounded lag), seq_cst (total ordering, may reduce reproducibility). Use relaxed by default; avoid default seq_cst.
 - **Next**: Implement in `handleShrink`; same pattern as PropertyBase::shrink with retry/timeout; reuse same config.
+
+### [ ] Add concurrency cross-list shrinking (rear -> front migration)
+- **Problem**: Current concurrency shrinking mostly reduces each list independently (front and each rear list), but does not model relationships between lists.
+- **Goal**: Add a shrink strategy that can move selected actions from rear lists (concurrent workflow) into front (serial workflow) when it preserves failure, to find simpler and more interpretable minimal cases.
+- **Why this matters**: Some failures depend more on action content than exact placement; migrating rear actions to front can reduce schedule complexity while keeping the core failing behavior.
+- **Complexity note**: This is likely a significant rework (not a small tuple-order tweak) and may require a new composite shrinker/search strategy over `(front, rears)` rather than independent list shrinking.
+- **Location**: Concurrency shrink candidate generation in `proptest/stateful/concurrency_function.hpp`, potentially with new shared shrink utilities.
+
+### [ ] Add multi-pass shrinking for tuples
+- **Problem**: Current shrinking primarily mutates one argument axis at a time, which can limit simplification quality for tuple-shaped inputs.
+- **Goal**: Support multi-pass shrinking for tuples.
+- **Approach A (incremental)**: Build multi-pass behavior by composing existing tuple shrink streams with `andThen` / `concat` (pass 1 result -> pass 2 shrink stream -> ...), with stop conditions (no progress / timeout / max passes).
+- **Approach B (new shrinker)**: Implement a dedicated tuple multi-pass shrinker that manages pass index/progress explicitly and emits candidates round-by-round.
+- **Scope**: Add tuple-shrinker support in the shrinker/generator stack and wire it into the main shrink candidate flow.
+- **Location**: tuple/shrinker utilities and `PropertyBase` shrink candidate flow.
+
+### [ ] Add stateful multi-pass shrinking (deferred until tuple multi-pass support)
+- **Problem**: A single pass over arguments may miss further simplification opportunities after the first successful reductions.
+- **Goal**: Add alternating multi-pass shrinking for stateful inputs (action list → object → ...) until no progress or timeout.
+- **Dependency**: Implement after `Add multi-pass shrinking for tuples`.
+- **Location**: stateful integration and `proptest/PropertyBase.cpp` shrink loop strategy.
+
+### [ ] Unify stateful/concurrency test frameworks
+- **Idea**: Treat stateful testing as a constrained case of concurrency testing (e.g., no rear lists / single serial schedule) and share one core execution + shrinking engine.
+- **Goal**: Reduce duplicated logic across stateful/concurrency paths (callbacks, failure reporting, shrinking/retry/timeout behavior, output formatting) while preserving current user-facing APIs.
+- **Scope**: Identify a common internal representation for schedules and action execution, then layer stateful/concurrency builders on top.
+- **Prerequisites (parity before unification)**:
+  - Add stateful-equivalent reproduction observability to concurrency (`setOnReproductionStats`, `setOnFailureReproduction`, `getLastReproductionStats`).
+  - Align failure semantics, especially buffered `PROP_EXPECT` / `PropertyContext` handling, so stateful and concurrency report failures consistently.
+  - Align shrink regeneration semantics (use saved random state consistently in concurrency shrink path).
+  - Design concurrency-aware stats/tag aggregation: collect per-thread stats/failures (thread-local or equivalent) during concurrent execution, then merge deterministically after join (with clear rules for counts, ordering, and thread attribution).
+  - Align stat/tag summary behavior and callback surface (including action lifecycle hooks) or explicitly define intentional differences.
+- **Risks**: Non-trivial refactor with behavior-regression risk; requires staged migration with compatibility tests.
+- **Location**: `proptest/stateful/stateful_function.hpp`, `proptest/stateful/concurrency_function.hpp`, and shared internals to be extracted.
 
 ### [ ] Regex-based string generator
 - `gen::regex(pattern)` (optional size/constraints). Use cases: email, phone, UUID, IP, custom formats.

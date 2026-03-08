@@ -4,6 +4,7 @@ This directory contains documentation for fundamental reusable properties that a
 
 ## Fundamental Properties
 
+0. ✅ **[General Guidelines](00_general_guidelines.md)** - Prefer general, abstraction-level properties over implementation-specific ones
 1. ✅ **[Algorithms / Data Structures](01_algorithms_data_structures.md)** - Correctness, complexity bounds, invariants
 2. ✅ **[Reference Comparison](02_reference_comparison.md)** - Correctness by comparison, performance criteria
 3. ✅ **[Consistency](03_consistency.md)** - Internal invariants maintained
