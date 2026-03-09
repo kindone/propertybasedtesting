@@ -32,6 +32,7 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **[x] Improve stateful shrink order (action list first)** — stateful internal `forAll` now orders tuple as `(actionList, initialObject)`, so existing tuple shrink naturally prioritizes action-list shrinking first.
 - **[x] Shrinking with retry + timeout for concurrency path** — implemented retry/timeout-aware shrink handling in concurrency `handleShrink`, added concurrency shrink config setters (`setShrinkMaxRetries`, `setShrinkTimeoutMs`, `setShrinkRetryTimeoutMs`), and validated with `concurrency_function.shrink_with_retry_timeout_smoke`.
 - **[x] Lower default action-list size + add stateful/concurrency list-size config** — reduced stateful/concurrency action-list default max to 20 and added explicit API knobs (`setActionListMinSize`, `setActionListMaxSize`, `setActionListSize`) for both paths; added validation tests (`stateful_function.action_list_size_configuration`, `concurrency_function.action_list_size_configuration`).
+- **[x] Replace GTest internal stdout/stderr capture dependency with output-stream options** — added configurable output/error streams on property config (`ForAllConfig.outputStream`, `ForAllConfig.errorStream`) and Property APIs (`setOutputStream`, `setErrorStream`, `setOutputStreams`), routed `PropertyBase` logs through configured streams, and migrated capture-based tests in `test_property.cpp` to `std::stringstream` injection.
 
 ---
 
@@ -61,18 +62,11 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **Constraint**: Stateful currently delegates through generic `forAll` argument printing; may require a custom wrapper/printer approach rather than a small local formatting change.
 - **Location**: stateful path formatting via `Property` argument printing and related display helpers.
 
-### [ ] Replace GTest internal stdout/stderr capture dependency with output-stream options
-- **Problem**: Some tests rely on `testing::internal::CaptureStdout()` / `CaptureStderr()` to assert output text. These are Google Test internal APIs and not stable public interfaces.
-- **Goal**: Add optional output-stream parameters so property execution can write to caller-provided streams in tests, while defaulting to current stdout/stderr behavior when not specified.
-- **Scope**: Introduce a user-facing/public config path for output sinks (e.g., in `ForAllConfig` / property config), then migrate tests away from GTest internal capture APIs.
-- **Validation**: Update output-verification tests to use injected streams (`std::stringstream`) and ensure existing CLI/CI output remains unchanged by default.
-- **Location**: `PropertyBase` output paths (`cout`/`cerr` writes), `Property` config surface (`Property.hpp` / `PropertyBase.hpp`), and tests in `proptest/test/*`.
-
-### [ ] Replace CaptureStdout/CaptureStderr-based tests with callback-driven assertions
-- **Problem**: Tests that assert console text via `CaptureStdout`/`CaptureStderr` are brittle and tied to Google Test internals.
-- **Goal**: Prefer callback-based observability for test assertions (e.g., existing and additional hooks), reducing dependence on output capture.
-- **Scope**: Expand callback surface where needed (while keeping APIs minimal), then migrate output-dependent tests to callback assertions first; use stream capture only as fallback.
-- **Examples**: Reproduction/shrink callbacks, per-failure callbacks, and optional new callbacks for key lifecycle events if needed.
+### [ ] Migrate output-dependent tests to callback-driven assertions (where feasible)
+- **Status**: `CaptureStdout`/`CaptureStderr` dependency is removed (replaced with output-stream injection); this remaining item is specifically about callback-first assertions.
+- **Goal**: Prefer callback-based observability for tests that currently assert formatted output text, reducing coupling to log formatting.
+- **Scope**: Expand callback surface where needed (while keeping APIs minimal), then migrate eligible output-dependent tests to callback assertions; keep stream-based assertions only for formatting-specific expectations.
+- **Examples**: Reproduction/shrink callbacks, per-failure callbacks, and optional lifecycle/event callbacks if needed.
 - **Location**: `PropertyBase`/stateful/concurrency callback APIs and tests under `proptest/test/*`.
 
 ### [ ] Add thin time API wrapper (steady clock abstraction)
