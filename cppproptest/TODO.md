@@ -33,6 +33,9 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **[x] Shrinking with retry + timeout for concurrency path** — implemented retry/timeout-aware shrink handling in concurrency `handleShrink`, added concurrency shrink config setters (`setShrinkMaxRetries`, `setShrinkTimeoutMs`, `setShrinkRetryTimeoutMs`), and validated with `concurrency_function.shrink_with_retry_timeout_smoke`.
 - **[x] Lower default action-list size + add stateful/concurrency list-size config** — reduced stateful/concurrency action-list default max to 20 and added explicit API knobs (`setActionListMinSize`, `setActionListMaxSize`, `setActionListSize`) for both paths; added validation tests (`stateful_function.action_list_size_configuration`, `concurrency_function.action_list_size_configuration`).
 - **[x] Replace GTest internal stdout/stderr capture dependency with output-stream options** — added configurable output/error streams on property config (`ForAllConfig.outputStream`, `ForAllConfig.errorStream`) and Property APIs (`setOutputStream`, `setErrorStream`, `setOutputStreams`), routed `PropertyBase` logs through configured streams, and migrated capture-based tests in `test_property.cpp` to `std::stringstream` injection.
+- **[x] Review `gen::construct` shrink behavior for stateful wrapper use** — reviewed `gen::construct` implementation (`construct -> tupleOf -> shrinkTupleUsingVector`) and tests; shrink order follows constructor argument order (left-to-right tuple element shrinking). This is suitable for a stateful wrapper if constructor args are ordered as `(actions, initial)`.
+- **[x] Add labeled shrink output for stateful path (`initial`, `actions`)** — stateful path now uses a wrapper arg generated with `gen::construct` and labeled `show(...)` output, producing labeled stateful shrink args while preserving action-list-first shrinking via constructor order `(actions, initial)`. Validated by `stateful_function.shrink_output_uses_labeled_stateful_args`.
+- **[x] Add explicit action names in stateful tests (avoid `Action<?>` in logs)** — updated stateful test generators to use named actions (`PROP_ACTION_NAME("PushBack", v)`, `"FailWhenNonEmpty"`, etc.) so shrink/failure output now shows concrete action names rather than `Action<?>`.
 
 ---
 
@@ -56,12 +59,6 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **Possible directions**: Lower default verbosity in test-only paths, gate detailed messages behind a debug flag, tune timeout test parameters/runs, and prefer deterministic assertions over broad retries where feasible.
 - **Location**: `proptest/test/test_shrink_retry.cpp`, related test utilities, and CI expectations/docs.
 
-### [ ] Add labeled shrink output for stateful path (`initial`, `actions`)
-- **Problem**: Stateful shrink output is positional tuple-style (`{ [actions], [initial] }`), which is less readable than labeled fields.
-- **Goal**: Provide labeled output for stateful shrink logs (e.g., `{ actions: [...], initial: ... }`) similar to concurrency labeling.
-- **Constraint**: Stateful currently delegates through generic `forAll` argument printing; may require a custom wrapper/printer approach rather than a small local formatting change.
-- **Location**: stateful path formatting via `Property` argument printing and related display helpers.
-
 ### [ ] Migrate output-dependent tests to callback-driven assertions (where feasible)
 - **Status**: `CaptureStdout`/`CaptureStderr` dependency is removed (replaced with output-stream injection); this remaining item is specifically about callback-first assertions.
 - **Goal**: Prefer callback-based observability for tests that currently assert formatted output text, reducing coupling to log formatting.
@@ -69,12 +66,22 @@ Tracks development tasks and feature enhancements for the C++ property-based tes
 - **Examples**: Reproduction/shrink callbacks, per-failure callbacks, and optional lifecycle/event callbacks if needed.
 - **Location**: `PropertyBase`/stateful/concurrency callback APIs and tests under `proptest/test/*`.
 
-### [ ] Add thin time API wrapper (steady clock abstraction)
-- **Problem**: Time logic currently uses `std::chrono::steady_clock` directly across code paths, making backend/library replacement harder.
-- **Goal**: Introduce a thin project-level time abstraction (e.g., `Clock`/`TimePoint` helpers) for elapsed-time measurements and timeout checks.
-- **Scope**: Wrap core `steady_clock` usages behind a small API, keep behavior unchanged, and refactor key timeout/shrink paths to use the wrapper.
-- **Benefit**: Improves modularity and allows swapping/adapting time backend in the future with minimal call-site changes.
-- **Location**: `proptest/std/chrono.hpp` (or new time wrapper), `PropertyBase`, stateful/concurrency timeout logic, and related tests.
+### [ ] Improve argument-output formatting (flatten stateful braces + optional named forAll args)
+- **Problem**: Stateful wrapper output currently appears with redundant nested braces (e.g., `with args: { { initial: ..., actions: ... } }`), and generic `forAll` output renders unnamed tuple-style args (e.g., `{ Seed(...), 2, 26 }`), which is less readable.
+- **Goal**: (1) Flatten stateful rendering to a single brace layer, and (2) support named argument rendering in `forAll` output (e.g., `{ seed: ..., sleepMs: ..., failDenominator: ... }`) when names are provided.
+- **Scope**: Refine `writeArgs`/`show` composition for wrapper types; design an opt-in parameter-name mechanism for `Property` output (without breaking existing API behavior).
+- **Compatibility**: Keep current default formatting behavior unless explicit naming metadata is supplied.
+- **Location**: `proptest/Property.hpp`, `proptest/PropertyBase.cpp`, stateful wrapper rendering in `proptest/stateful/stateful_function.hpp`, and relevant output tests.
+
+### [ ] Add thin std-abstraction layer (time wrapper as first scope)
+- **Parent task**: Centralize standard-library/backend indirection in `proptest/std` so call sites avoid direct dependency on specific std headers/backends.
+- **Problem**: Direct std header usage (e.g., `<memory>`, `<concepts>`, `<cstdint>`, `<chrono>`) is spread across code paths, making future adaptation to alternative/backport 3rd-party libraries harder and increasing explicit `std::` coupling/conflict at call sites.
+- **Goal**: Resolve std/backend adaptation in `proptest/std` dedicated wrappers only, while keeping external behavior unchanged.
+- **Child tasks**:
+  - [ ] **Thin time API wrapper**: introduce `Clock`/`TimePoint` helpers and refactor timeout/shrink elapsed-time checks to use `proptest/std` time wrapper.
+  - [ ] **Std include boundary policy**: allow core std headers via dedicated wrappers under `proptest/std/*` only (e.g., wrappers for memory/concepts/inttypes/chrono as needed), then migrate call sites to wrapper includes.
+- **Benefit**: Improves modularity, reduces direct `std::` coupling at call sites, and makes backend/library substitution localized to `proptest/std`.
+- **Location**: `proptest/std/*` wrapper headers, `PropertyBase`, stateful/concurrency timeout logic, and dependent call sites/tests.
 
 ### [ ] Add validation test for stateful shrink-order behavior
 - **Problem**: We changed stateful internal tuple order to prioritize action-list shrinking first, but there is no dedicated regression test that verifies this behavior.
