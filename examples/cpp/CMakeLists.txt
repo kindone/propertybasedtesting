@@ -27,3 +27,9 @@ ADD_EXECUTABLE(sample_proptest sample_proptest.cpp)
 TARGET_INCLUDE_DIRECTORIES(sample_proptest PRIVATE ${cppproptest2_SOURCE_DIR})
 TARGET_LINK_LIBRARIES(sample_proptest PRIVATE proptest gtest_main)
 ADD_TEST(NAME sample_proptest COMMAND sample_proptest)
+
+# Sample stateful test executable
+ADD_EXECUTABLE(sample_stateful_test sample_stateful_test.cpp)
+TARGET_INCLUDE_DIRECTORIES(sample_stateful_test PRIVATE ${cppproptest2_SOURCE_DIR})
+TARGET_LINK_LIBRARIES(sample_stateful_test PRIVATE proptest gtest_main)
+ADD_TEST(NAME sample_stateful_test COMMAND sample_stateful_test)
