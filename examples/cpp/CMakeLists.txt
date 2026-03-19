@@ -22,6 +22,15 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+# Fetch nlohmann/json (header-only)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Sample property test executable
 ADD_EXECUTABLE(sample_proptest sample_proptest.cpp)
 TARGET_INCLUDE_DIRECTORIES(sample_proptest PRIVATE ${cppproptest2_SOURCE_DIR})
@@ -33,3 +42,9 @@ ADD_EXECUTABLE(sample_stateful_test sample_stateful_test.cpp)
 TARGET_INCLUDE_DIRECTORIES(sample_stateful_test PRIVATE ${cppproptest2_SOURCE_DIR})
 TARGET_LINK_LIBRARIES(sample_stateful_test PRIVATE proptest gtest_main)
 ADD_TEST(NAME sample_stateful_test COMMAND sample_stateful_test)
+
+# Property tests for nlohmann/json
+ADD_EXECUTABLE(json_proptest json_proptest.cpp)
+TARGET_INCLUDE_DIRECTORIES(json_proptest PRIVATE ${cppproptest2_SOURCE_DIR})
+TARGET_LINK_LIBRARIES(json_proptest PRIVATE proptest gtest_main nlohmann_json::nlohmann_json)
+ADD_TEST(NAME json_proptest COMMAND json_proptest)
