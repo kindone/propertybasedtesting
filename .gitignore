@@ -1,0 +1,12 @@
+# CMake (out-of-source builds, e.g. lab/*/build)
+build/
+
+# Node (lab installs)
+node_modules/
+
+# Python (lab venvs and caches)
+.venv/
+venv/
+*.egg-info/
+__pycache__/
+*.py[cod]

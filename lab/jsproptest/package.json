@@ -1,0 +1,15 @@
+{
+    "name": "jsproptest-lab",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": "^18.18.0 || ^20.9.0 || >=21.1.0"
+    },
+    "scripts": {
+        "postinstall": "node scripts/ensure-jsproptest-built.mjs",
+        "start": "node src/poc_basic.mjs"
+    },
+    "dependencies": {
+        "jsproptest": "github:kindone/jsproptest"
+    }
+}
